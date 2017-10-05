@@ -1,6 +1,6 @@
 ![Good friend lol](./images/doraemon_nobita.gif)  
 
-This is the code for the paper **Improving Lexical Choice in NMT**. The branches are:  
+This is the code for the paper [**Improving Lexical Choice in NMT**](https://arxiv.org/abs/1710.01329). The branches are:  
 
 * master: baseline NMT
 * tied_embedding: baseline NMT with tied embedding
