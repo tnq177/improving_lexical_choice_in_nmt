@@ -61,7 +61,11 @@ class Encoder(object):
         outputs.set_shape([const_num_steps, const_batch_size, output_size])
         return tf.transpose(outputs, [1, 0, 2])
 
-    def beam_decode(self, trg_embedding, bos_id, eos_id, output_func, output_size, logprob_func, num_classes, max_length, tensor_to_state_func, alpha=-1, beam_size=12, feed_input=True, initial_state=None, reuse=True):
+    def beam_decode(self, trg_embedding, bos_id, eos_id, output_func, output_size, logit_func, num_classes, max_length, tensor_to_state_func, alpha=-1, beam_size=12, feed_input=True, initial_state=None, reuse=True):
+        def logprob_func(att_output):
+            logits = logit_func(att_output)
+            return tf.nn.log_softmax(logits)
+
         eos_mask = tf.cast(tf.equal(tf.range(0, num_classes), eos_id), tf.float32)
 
         def cond(time_step, prev_states, prev_outputs, all_probs, all_scores, all_symbols, all_parents, all_alignments):
@@ -81,6 +85,7 @@ class Encoder(object):
             inp = tf.nn.embedding_lookup(trg_embedding, last_symbols)
             if feed_input:
                 inp = tf.concat([inp, prev_outputs], 1)
+
             inp = tf.split(inp, beam_size, axis=0)
             states = tf.split(prev_states, beam_size, axis=0)
             states = [tf.squeeze(_state, [0]) for _state in states]
@@ -110,6 +115,7 @@ class Encoder(object):
             last_scores.set_shape([beam_size])
             last_scores = tf.reshape(last_scores, [beam_size, 1])
 
+            # https://arxiv.org/pdf/1609.08144.pdf, equation 14, no coverage
             if alpha == -1:
                 length_penalty = 1
             else:

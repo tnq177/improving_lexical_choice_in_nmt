@@ -23,6 +23,7 @@ class Validator(object):
         self.logger.info('Initializing validator')
 
         self.data_manager = data_manager
+        _, self.trg_ivocab = self.data_manager.init_vocab(self.data_manager.trg_lang)
         
         def get_cpkt_path(score):
             return join(config['save_to'], '{}-{}.cpkt'.format(config['model_name'], score))
@@ -52,7 +53,7 @@ class Validator(object):
             self.bleu_curve = numpy.load(self.bleu_curve_path)
         if exists(self.best_bleus_path):
             self.best_bleus = numpy.load(self.best_bleus_path)
-
+            
     def _ids_to_trans(self, trans_ids):
         words = []
         for idx in trans_ids:
@@ -89,8 +90,6 @@ class Validator(object):
 
 
     def evaluate(self, sess, dev_m, mode=ac.VALIDATING):
-        _, self.trg_ivocab = self.data_manager.init_vocab(self.data_manager.trg_lang)
-        
         if mode == ac.VALIDATING:
             val_trans_out = self.val_trans_out
             val_beam_out = self.val_beam_out
