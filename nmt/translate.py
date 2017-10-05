@@ -30,6 +30,7 @@ class Translator(object):
         self.model_file = args.model_file
         self.plot_align = args.plot_align
         self.unk_repl   = args.unk_repl
+        self.lex_table_path = args.lexical_file
 
         if self.input_file is None or self.model_file is None or not os.path.exists(self.input_file) or not os.path.exists(self.model_file + '.meta'):
             raise ValueError('Input file or model file does not exist')
@@ -71,7 +72,7 @@ class Translator(object):
         d = self.config['init_range']
         initializer = tf.random_uniform_initializer(-d, d)
         with tf.variable_scope(self.config['model_name'], reuse=reuse, initializer=initializer):
-            return Model(self.config, mode)
+            return Model(self.config, mode, self.lex_table_path)
 
     def get_trans(self, probs, scores, symbols, parents, alignments, no_unk_src_toks):
         sorted_rows = numpy.argsort(scores[:, -1])[::-1]
@@ -153,6 +154,7 @@ class Translator(object):
             model = self.get_model(ac.VALIDATING)
 
             with tf.Session() as sess:
+                sess.run(tf.global_variables_initializer())
                 self.logger.info('Restore model from {}'.format(self.model_file))
                 saver = tf.train.Saver(var_list=tf.trainable_variables())
                 saver.restore(sess, self.model_file)

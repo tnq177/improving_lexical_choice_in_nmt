@@ -8,6 +8,7 @@ This is the code for the paper **Improving Lexical Choice in NMT**. The branches
 * fixnorm_lex: fixnorm+lex model in paper
 * arthur: apply the method of [Arthur et al.](https://arxiv.org/abs/1606.02006) on top of baseline NMT
 
+This branch is meant to reproduce the work of Arthur et al. above (see our paper for more information since we only reproduce one model of their proposed approaches). All train/translate commands are the same, just add one more flag ```--lexical-file``` which points to the lexical table which is a numpy array of rows representing the source type ids, and columns represent target type ids (so it's a [src_vocab_size, target_vocab_size] table). We follow the [tutorial here](http://masatohagiwara.net/using-giza-to-obtain-word-alignment-between-bilingual-sentences.html) to learn a lexical table with Giza++ (with reverse order to get t(e|f), of course). Then use ```gen_lexical_table.py``` to generate the lexical table which we pass to ```--lexical-table``` flag. 
 
 To train a model:
 * write a configuration function in ```configurations.py```

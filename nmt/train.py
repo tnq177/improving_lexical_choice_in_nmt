@@ -22,6 +22,7 @@ class Trainer(object):
         super(Trainer, self).__init__()
         self.config = getattr(configurations, args.proto)()
         self.num_preload = args.num_preload
+        self.lex_table_path = args.lexical_file
         self.logger = ut.get_logger(self.config['log_file'])
 
         self.lr = self.config['lr']
@@ -60,7 +61,7 @@ class Trainer(object):
         d = self.config['init_range']
         initializer = tf.random_uniform_initializer(-d, d, seed=ac.SEED)
         with tf.variable_scope(self.config['model_name'], reuse=reuse, initializer=initializer):
-            return Model(self.config, mode)
+            return Model(self.config, mode, self.lex_table_path)
 
     def reload_and_get_cpkt_saver(self, config, sess):
         cpkt_path = join(config['save_to'], '{}.cpkt'.format(config['model_name']))

@@ -18,6 +18,8 @@ if __name__ == '__main__':
                                 less randomized.""")
     parser.add_argument('--input-file', type=str, 
                         help='Input file if mode == translate')
+    parser.add_argument('--lexical-file', type=str, required=True,
+                        help='Path to lexical file')
     parser.add_argument('--model-file', type=str,
                         help='Path to saved checkpoint if mode == translate')
     parser.add_argument('--var-list', nargs='+',
