@@ -99,6 +99,5 @@ ENV/
 
 # mypy
 .mypy_cache/
-nmt/data/
 nmt/saved_models
 nmt/logdir/train/
