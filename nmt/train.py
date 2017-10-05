@@ -88,6 +88,9 @@ class Trainer(object):
                 self.logger.info('Set learning rate to {}'.format(self.lr))
                 sess.run(tf.assign(self.train_m.lr, self.lr))
 
+                # Initialize all word embeddings to have norm embed_norm
+                sess.run([self.train_m.normalize_src_embeds, self.train_m.normalize_trg_embeds, self.train_m.normalize_lex_embeds])
+
                 for e in xrange(self.max_epochs):
                     for b, batch_data in self.data_manager.get_batch(mode=ac.TRAINING, num_batches=self.num_preload):
                         self.run_log_save(sess, b, e, batch_data)
@@ -164,6 +167,9 @@ class Trainer(object):
         }
         loss, _ = sess.run([self.train_m.loss, self.train_m.train_op], feed)
 
+        if self.num_batches_done % 10 == 0:
+            sess.run([self.train_m.normalize_trg_embeds, self.train_m.normalize_lex_embeds])
+            
         num_trg_words = numpy.sum(target_weights)
         self.num_batches_done += 1
         self.epoch_batches_done += 1
@@ -172,6 +178,7 @@ class Trainer(object):
         self.log_train_loss += loss
         self.log_train_weights += num_trg_words
         self.epoch_time += time.time() - start
+
 
         if self.num_batches_done % (10 * self.log_freq) == 0: 
             self.sample_input(batch_data)

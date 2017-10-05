@@ -37,7 +37,7 @@ class Encoder(object):
         def cond(t, *_):
             return tf.less(t, num_steps)
 
-        def body(t, output_ta_t, state, prev_output):
+        def body(t, output_ta_t, c_embed_ta_t, state, prev_output):
             inp = input_ta.read(t)
             inp.set_shape([const_batch_size, const_input_size])
             if feed_input:
@@ -46,22 +46,29 @@ class Encoder(object):
             with tf.variable_scope(self.scope, reuse=reuse):
                 h_t, state = self.cell(inp, state)
 
-            output, _ = output_func(h_t)
+            output, c_embed, _ = output_func(h_t)
             output_ta_t = output_ta_t.write(t, output)
+            c_embed_ta_t = c_embed_ta_t.write(t, c_embed)
 
-            return tf.add(t, 1), output_ta_t, state, output
+            return tf.add(t, 1), output_ta_t, c_embed_ta_t, state, output
 
         output_ta = tf.TensorArray(dtype=tf.float32, size=num_steps)
+        c_embed_ta = tf.TensorArray(dtype=tf.float32, size=num_steps)
         state = initial_state if initial_state is not None else self.cell.zero_state(batch_size, dtype=tf.float32)
         prev_output = tf.zeros([batch_size, output_size])
-        loop_vars = [tf.constant(0, tf.int32), output_ta, state, prev_output]
+        loop_vars = [tf.constant(0, tf.int32), output_ta, c_embed_ta, state, prev_output]
         loop_vars = tf.while_loop(cond, body, loop_vars, swap_memory=True)
 
         outputs = loop_vars[1].stack()
-        outputs.set_shape([const_num_steps, const_batch_size, output_size])
-        return tf.transpose(outputs, [1, 0, 2])
+        c_embeds = loop_vars[2].stack()
 
-    def beam_decode(self, trg_embedding, bos_id, eos_id, output_func, output_size, logprob_func, num_classes, max_length, tensor_to_state_func, alpha=-1, beam_size=12, feed_input=True, initial_state=None, reuse=True):
+        return tf.transpose(outputs, [1, 0, 2]), tf.transpose(c_embeds, [1, 0, 2])
+
+    def beam_decode(self, trg_embedding, bos_id, eos_id, output_func, output_size, logit_func, num_classes, max_length, tensor_to_state_func, alpha=-1, beam_size=12, feed_input=True, initial_state=None, reuse=True):
+        def logprob_func(att_output, c_embed):
+            logits = logit_func(att_output, c_embed)
+            return tf.nn.log_softmax(logits)
+
         eos_mask = tf.cast(tf.equal(tf.range(0, num_classes), eos_id), tf.float32)
 
         def cond(time_step, prev_states, prev_outputs, all_probs, all_scores, all_symbols, all_parents, all_alignments):
@@ -81,6 +88,7 @@ class Encoder(object):
             inp = tf.nn.embedding_lookup(trg_embedding, last_symbols)
             if feed_input:
                 inp = tf.concat([inp, prev_outputs], 1)
+
             inp = tf.split(inp, beam_size, axis=0)
             states = tf.split(prev_states, beam_size, axis=0)
             states = [tf.squeeze(_state, [0]) for _state in states]
@@ -88,6 +96,7 @@ class Encoder(object):
 
             current_states = []
             current_outputs = []
+            current_c_embeds = []
             current_alignments = []
 
             for j in xrange(beam_size):
@@ -95,12 +104,13 @@ class Encoder(object):
                 with tf.variable_scope(self.scope, reuse=True):
                     h_t, state = self.cell(inp[j], states[j])
 
-                output, aligments = output_func(h_t)
+                output, c_embed, aligments = output_func(h_t)
                 current_states.append(state)
                 current_outputs.append(output)
+                current_c_embeds.append(c_embed)
                 current_alignments.append(aligments)
 
-            probs = logprob_func(tf.concat(current_outputs, 0))
+            probs = logprob_func(tf.concat(current_outputs, 0), tf.concat(current_c_embeds, 0))
 
             last_eos_mask = tf.equal(last_symbols, eos_id)
             last_probs = all_probs.read(time_step - 1)
@@ -110,6 +120,7 @@ class Encoder(object):
             last_scores.set_shape([beam_size])
             last_scores = tf.reshape(last_scores, [beam_size, 1])
 
+            # https://arxiv.org/pdf/1609.08144.pdf, equation 14, no coverage
             if alpha == -1:
                 length_penalty = 1
             else:
@@ -162,8 +173,8 @@ class Encoder(object):
             with tf.variable_scope(self.scope, reuse=reuse):
                 h_t, state = self.cell(inp, state)
 
-            output, aligments = output_func(h_t)
-            probs = logprob_func(output)
+            output, c_embed, aligments = output_func(h_t)
+            probs = logprob_func(output, c_embed)
             probs = (1.0 - eos_mask) * probs + eos_mask * tf.float32.min # no EOS for first beam
             probs = tf.reshape(probs, [num_classes])
             max_probs, symbols = tf.nn.top_k(probs, k=beam_size)
