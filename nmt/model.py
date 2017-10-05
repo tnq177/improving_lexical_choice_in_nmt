@@ -4,7 +4,7 @@ from __future__ import division
 from functools import partial
 
 import tensorflow as tf
-from layers import Attention, FeedForward, Encoder, Softmax
+from layers import Attention, FeedForward, Encoder
 from tensorflow.contrib.seq2seq import sequence_loss
 import nmt.all_constants as ac
 import nmt.utils as ut
@@ -19,7 +19,6 @@ class Model(object):
         DEC_SCOPE = 'decoder'
         ATT_SCOPE = 'attention'
         OUT_SCOPE = 'outputer'
-        SFM_SCOPE = 'softmax'
 
         batch_size = config['batch_size']
         feed_input = config['feed_input']
@@ -70,6 +69,7 @@ class Model(object):
             self.trg_embedding = tf.get_variable('embedding',
                                             shape=[trg_vocab_size, trg_embed_size],
                                             dtype=tf.float32)
+            self.bias = tf.get_variable('bias', shape=[trg_vocab_size], dtype=tf.float32)
 
         # Then select the RNN cell, reuse if not in TRAINING mode
         if rnn_type != ac.LSTM:
@@ -85,7 +85,6 @@ class Model(object):
         encoder = Encoder(encoder_cell, ENC_SCOPE)
         decoder = Encoder(decoder_cell, DEC_SCOPE)
         outputer = FeedForward(enc_rnn_size + dec_rnn_size, att_state_size, OUT_SCOPE, activate_func=tf.tanh)
-        self.softmax = softmax = Softmax(att_state_size, trg_vocab_size, SFM_SCOPE)
 
         # Encode source sentence
         encoder_inputs = tf.nn.embedding_lookup(self.src_embedding, self.src_inputs)
@@ -104,6 +103,10 @@ class Model(object):
             output = outputer.transform(c_t_h_t)
             return output, alignments
 
+        def logit_func(att_output):
+            _att_output = tf.reshape(att_output, [-1, att_state_size])
+            return tf.matmul(_att_output, self.trg_embedding, transpose_a=False, transpose_b=True) + self.bias
+
 
         # Fit everything in the decoder & start decoding
         decoder_inputs = tf.nn.embedding_lookup(self.trg_embedding, self.trg_inputs)
@@ -112,10 +115,9 @@ class Model(object):
                                              decoder_output_func, att_state_size,
                                              feed_input=feed_input, initial_state=last_state,
                                              reuse=False)
-        attentional_outputs = tf.reshape(attentional_outputs, [-1, att_state_size])
 
         # Loss
-        logits = softmax.calc_logits(attentional_outputs)
+        logits = logit_func(attentional_outputs)
         logits = tf.reshape(logits, [batch_size, -1, trg_vocab_size])
         loss = sequence_loss(logits,
                              self.trg_targets,
@@ -130,7 +132,7 @@ class Model(object):
             tensor_to_state = partial(ut.tensor_to_lstm_state, num_layers=config['num_layers'])
             beam_outputs = decoder.beam_decode(self.trg_embedding, ac.BOS_ID, ac.EOS_ID,
                                                decoder_output_func, att_state_size,
-                                               softmax.calc_logprobs, trg_vocab_size,
+                                               logit_func, trg_vocab_size,
                                                max_output_length, tensor_to_state,
                                                alpha=beam_alpha, beam_size=beam_size, feed_input=feed_input,
                                                initial_state=last_state, reuse=True)
