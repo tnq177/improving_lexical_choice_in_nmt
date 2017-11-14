@@ -196,7 +196,8 @@ class Validator(object):
             self.logger.info('Delete {} & use {} instead'.format(min_bleu, bleu_score))
             self.best_bleus = numpy.delete(self.best_bleus, min_idx)
 
-            cpkt_path = self.get_cpkt_path(bleu_score)
+            # Delete the right checkpoint
+            cpkt_path = self.get_cpkt_path(min_bleu)
             cpkt_path_data = cpkt_path + '.data-00000-of-00001'
             cpkt_path_meta = cpkt_path + '.meta'
             cpkt_path_index = cpkt_path + '.index'
