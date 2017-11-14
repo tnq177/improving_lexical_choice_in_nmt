@@ -1,4 +1,5 @@
-![Good friend lol](./images/doraemon_nobita.gif)  
+![Good friend lol](./images/doraemon_nobita.gif)
+Tested with Python 2.7.3 and Tensorflow 1.1
 
 This is the code for the paper [**Improving Lexical Choice in NMT**](https://arxiv.org/abs/1710.01329). The branches are:  
 
