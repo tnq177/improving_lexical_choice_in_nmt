@@ -1,6 +1,10 @@
-![Good friend lol](./images/doraemon_nobita.gif)
-Tested with Python 2.7.3 and Tensorflow 1.1
+![Good friend lol](./images/doraemon_nobita.gif)  
 
+
+Tested with Python 2.7.3 and Tensorflow 1.1  
+
+
+## General
 This is the code for the paper [**Improving Lexical Choice in NMT**](https://arxiv.org/abs/1710.01329). The branches are:  
 
 * master: baseline NMT
@@ -19,4 +23,10 @@ Depending on your config function, the code generates a direction under ```nmt/s
 To translate with UNK replacement:
 * run: ```python -m nmt --proto your_config_func --mode translate --unk-repl --model-file path_your_saved_checkpoint.cpkt --input-file path_to_input_file```  
 
-Remember the checkpoint includes data file, meta file, ... but just link to ```.cpkt```, ignore the extension. 
+Remember the checkpoint includes data file, meta file, ... but just link to ```.cpkt```, ignore the extension.  
+
+## References
+Code & scripts might be inspired/borrowed from some sources:
+* https://github.com/moses-smt/mosesdecoder
+* https://github.com/mila-udem/blocks-examples/tree/master/machine_translation
+* https://github.com/EdinburghNLP/nematus
