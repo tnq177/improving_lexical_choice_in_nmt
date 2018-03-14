@@ -61,15 +61,14 @@ class Model(object):
         self.target_weights     = tf.placeholder(tf.float32, [batch_size, None])
 
         # First, define the src/trg embeddings
-        with tf.variable_scope(ENC_SCOPE):
-            self.src_embedding = tf.get_variable('embedding',
-                                            shape=[src_vocab_size, src_embed_size],
-                                            dtype=tf.float32)
-        with tf.variable_scope(DEC_SCOPE):
-            self.trg_embedding = tf.get_variable('embedding',
-                                            shape=[trg_vocab_size, trg_embed_size],
-                                            dtype=tf.float32)
-            self.bias = tf.get_variable('bias', shape=[trg_vocab_size], dtype=tf.float32)
+        self.src_embedding = tf.get_variable('src_embedding',
+                                        shape=[src_vocab_size, src_embed_size],
+                                        dtype=tf.float32)
+        self.transposed_trg_embedding = tf.get_variable('transposed_trg_embedding',
+                                        shape=[trg_embed_size, trg_vocab_size],
+                                        dtype=tf.float32)
+        self.trg_embedding = tf.transpose(self.transposed_trg_embedding, name='trg_embedding')
+        self.bias = tf.get_variable('bias', shape=[trg_vocab_size], dtype=tf.float32)
 
         # Then select the RNN cell, reuse if not in TRAINING mode
         if rnn_type != ac.LSTM:
@@ -105,7 +104,7 @@ class Model(object):
 
         def logit_func(att_output):
             _att_output = tf.reshape(att_output, [-1, att_state_size])
-            return tf.matmul(_att_output, self.trg_embedding, transpose_a=False, transpose_b=True) + self.bias
+            return tf.matmul(_att_output, self.transposed_trg_embedding) + self.bias
 
 
         # Fit everything in the decoder & start decoding
