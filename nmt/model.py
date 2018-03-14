@@ -7,7 +7,7 @@ import numpy
 import tensorflow as tf
 from tensorflow.contrib.seq2seq import sequence_loss
 
-from layers import Attention, FeedForward, Encoder, Softmax
+from layers import Attention, FeedForward, Encoder
 import nmt.all_constants as ac
 import nmt.utils as ut
 
@@ -21,7 +21,6 @@ class Model(object):
         DEC_SCOPE = 'decoder'
         ATT_SCOPE = 'attention'
         OUT_SCOPE = 'outputer'
-        SFM_SCOPE = 'softmax'
 
         batch_size = config['batch_size']
         feed_input = config['feed_input']
@@ -67,9 +66,11 @@ class Model(object):
         self.src_embedding = tf.get_variable('src_embedding',
                                         shape=[src_vocab_size, src_embed_size],
                                         dtype=tf.float32)
-        self.trg_embedding = tf.get_variable('trg_embedding',
-                                        shape=[trg_vocab_size, trg_embed_size],
+        self.transposed_trg_embedding = tf.get_variable('transposed_trg_embedding',
+                                        shape=[trg_embed_size, trg_vocab_size],
                                         dtype=tf.float32)
+        self.trg_embedding = tf.transpose(self.transposed_trg_embedding)
+        self.bias = tf.get_variable('bias', shape=[trg_vocab_size], dtype=tf.float32)
 
         lex_table_npy = numpy.load(lex_table_path)
         self.lex_table = tf.get_variable('lex_table',
@@ -92,7 +93,6 @@ class Model(object):
         encoder = Encoder(encoder_cell, ENC_SCOPE)
         decoder = Encoder(decoder_cell, DEC_SCOPE)
         outputer = FeedForward(enc_rnn_size + dec_rnn_size, att_state_size, OUT_SCOPE, activate_func=tf.tanh)
-        softmax = Softmax(att_state_size, trg_vocab_size, SFM_SCOPE)
 
         # Encode source sentence
         encoder_inputs = tf.nn.embedding_lookup(self.src_embedding, self.src_inputs)
@@ -126,7 +126,7 @@ class Model(object):
 
         def logit_func(att_output, lex_prob):
             _att_output = tf.reshape(att_output, [-1, att_state_size])
-            nmt_logit = softmax.calc_logits(_att_output)
+            nmt_logit = tf.matmul(_att_output, self.transposed_trg_embedding) + self.bias
             nmt_logit = tf.reshape(nmt_logit, [-1, trg_vocab_size])
 
             lex_logit = tf.log(lex_prob + 0.001)

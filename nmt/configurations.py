@@ -37,7 +37,6 @@ def ta2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -79,7 +78,6 @@ def ur2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -121,7 +119,6 @@ def ha2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -163,7 +160,6 @@ def tu2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -205,7 +201,6 @@ def uz2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -247,7 +242,6 @@ def hu2en():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -289,7 +283,6 @@ def en2vi():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 1.0
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -331,7 +324,6 @@ def en2ja():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 0.5
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -373,7 +365,6 @@ def en2ja_btec():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 0.5
-    config['save_freq']         = 200
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
@@ -415,7 +406,6 @@ def en2de():
     config['feed_input']        = True
     config['reload']            = True
     config['validate_freq']     = 0.25
-    config['save_freq']         = 2000
     config['beam_size']         = 12
     config['beam_alpha']        = 0.8
     config['n_best']            = 1
