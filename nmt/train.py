@@ -26,7 +26,6 @@ class Trainer(object):
 
         self.lr = self.config['lr']
         self.max_epochs = self.config['max_epochs']
-        self.save_freq = self.config['save_freq']
         self.cpkt_path = None
         self.validate_freq = None
         self.train_perps = []
@@ -88,16 +87,18 @@ class Trainer(object):
                 self.logger.info('Set learning rate to {}'.format(self.lr))
                 sess.run(tf.assign(self.train_m.lr, self.lr))
 
-                # Initially normalize all embeddings
-                sess.run([self.train_m.normalize_src_embeds, self.train_m.normalize_trg_embeds])
+                # Initially normalize src embeddings to embed_norm
+                sess.run(self.train_m.normalize_src_embeds)
 
                 for e in xrange(self.max_epochs):
                     for b, batch_data in self.data_manager.get_batch(mode=ac.TRAINING, num_batches=self.num_preload):
-                        self.run_log_save(sess, b, e, batch_data)
+                        self.run_and_log(sess, b, e, batch_data)
                         self.maybe_validate(sess)
 
+                    self.save_checkpoint(sess)
                     self.report_epoch(e)
 
+                self.save_checkpoint(sess)
                 self.logger.info('It is finally done, mate!')
                 self.logger.info('Train perplexities:')
                 self.logger.info(', '.join(map(str, self.train_perps)))
@@ -107,13 +108,14 @@ class Trainer(object):
                 self.saver.save(sess, self.cpkt_path)
 
                 # Evaluate on test
-                if exists(self.data_manager.ids_files[ac.TESTING]):
+                test_file = self.data_manager.data_files[ac.TESTING][self.data_manager.src_lang]
+                if exists(test_file):
                     self.logger.info('Evaluate on test')
                     best_bleu = numpy.max(self.validator.best_bleus)
                     best_cpkt_path = self.validator.get_cpkt_path(best_bleu)
                     self.logger.info('Restore best cpkt from {}'.format(best_cpkt_path))
                     self.saver.restore(sess, best_cpkt_path)
-                    self.validator.evaluate(sess, self.dev_m, mode=ac.TESTING)
+                    self.validator.translate(sess, self.dev_m, test_file, unk_repl=True)
 
     def report_epoch(self, e):
         self.logger.info('Finish epoch {}'.format(e + 1))
@@ -155,7 +157,7 @@ class Trainer(object):
         self.logger.info(u'Tar: {}'.format(target))
         self.logger.info(u'W: {}'.format(weight))
 
-    def run_log_save(self, sess, b, e, batch_data):
+    def run_and_log(self, sess, b, e, batch_data):
         start = time.time()
         src_inputs, src_seq_lengths, trg_inputs, trg_targets, target_weights = batch_data
         feed = {
@@ -167,9 +169,6 @@ class Trainer(object):
         }
         loss, _ = sess.run([self.train_m.loss, self.train_m.train_op], feed)
 
-        if self.num_batches_done % 10 == 0:
-            sess.run(self.train_m.normalize_trg_embeds)
-            
         num_trg_words = numpy.sum(target_weights)
         self.num_batches_done += 1
         self.epoch_batches_done += 1
@@ -197,14 +196,15 @@ class Trainer(object):
             self.logger.info('   acc trg words/s: {}'.format(int(acc_speed_word)))
             self.logger.info('   acc sec/batch:   {0:.2f}'.format(acc_speed_time))
 
-        if self.num_batches_done % self.save_freq == 0:
-            start = time.time()
-            self.saver.save(sess, self.cpkt_path)
-            self.logger.info('Save model to {}, takes {}'.format(self.cpkt_path, ut.format_seconds(time.time() - start)))
-
     def maybe_validate(self, sess):
         if self.num_batches_done % self.validate_freq == 0:
+            self.save_checkpoint(sess)
             self.validator.validate_and_save(sess, self.dev_m, self.saver)
+
+    def save_checkpoint(self, sess):
+        start = time.time()
+        self.saver.save(sess, self.cpkt_path)
+        self.logger.info('Save model to {}, takes {}'.format(self.cpkt_path, ut.format_seconds(time.time() - start)))
 
     def _call_me_maybe(self):
         pass # NO

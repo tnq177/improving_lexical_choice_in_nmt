@@ -65,12 +65,12 @@ class Model(object):
         self.src_embedding = tf.get_variable('src_embedding',
                                         shape=[src_vocab_size, src_embed_size],
                                         dtype=tf.float32)
-        self.trg_embedding = tf.get_variable('trg_embedding',
-                                        shape=[trg_vocab_size, trg_embed_size],
+        self.trg_v = tf.get_variable('trg_v',
+                                        shape=[trg_embed_size, trg_vocab_size],
                                         dtype=tf.float32)
-        self.sm_bias = tf.get_variable('sm_bias',
-                                        shape=[trg_vocab_size],
-                                        dtype=tf.float32)
+        self.transposed_trg_embedding = embed_norm * tf.nn.l2_normalize(self.trg_v, 0)
+        self.trg_embedding = tf.transpose(self.transposed_trg_embedding, name='trg_embedding')
+        self.bias = tf.get_variable('bias', shape=[trg_vocab_size], dtype=tf.float32)
 
         # Then select the RNN cell, reuse if not in TRAINING mode
         if rnn_type != ac.LSTM:
@@ -103,14 +103,12 @@ class Model(object):
             alignments, c_t = attention.calc_context(self.src_seq_lengths, h_t)
             c_t_h_t = tf.concat([c_t, h_t], 1)
             output = outputer.transform(c_t_h_t)
-
             return output, alignments
 
         def logit_func(att_output):
             _att_output = tf.reshape(att_output, [-1, att_state_size])
             _att_output = project_embeds(_att_output)
-            _logits = tf.matmul(_att_output, self.trg_embedding, transpose_b=True) + self.sm_bias
-
+            _logits = tf.matmul(_att_output, self.transposed_trg_embedding) + self.bias
             return _logits
 
         # Fit everything in the decoder & start decoding
@@ -158,7 +156,6 @@ class Model(object):
 
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-            self.normalize_trg_embeds = tf.assign(self.trg_embedding, project_embeds(self.trg_embedding, 1))
             self.normalize_src_embeds = tf.assign(self.src_embedding, project_embeds(self.src_embedding, 1))
 
         # Finally, log out some model's stats

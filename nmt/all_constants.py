@@ -27,6 +27,8 @@ UNK_ID = 3
 
 _DIGIT_RE = re.compile(br'\d')
 
+BPE_DELIMITER = u'@@ '
+
 TRAINING = 'training'
 VALIDATING = 'validating'
 TESTING = 'testing'
