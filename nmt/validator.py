@@ -23,7 +23,7 @@ class Validator(object):
         self.logger.info('Initializing validator')
 
         self.data_manager = data_manager
-        _, self.trg_ivocab = self.data_manager.init_vocab(self.data_manager.trg_lang)
+        self.restore_segments = config['restore_segments']
         
         def get_cpkt_path(score):
             return join(config['save_to'], '{}-{}.cpkt'.format(config['model_name'], score))
@@ -37,11 +37,19 @@ class Validator(object):
         self.save_to = config['save_to']
         if not exists(self.save_to):
             os.makedirs(self.save_to)
+            
+        _, self.trg_ivocab = self.data_manager.init_vocab(self.data_manager.trg_lang)
 
         self.val_trans_out = config['val_trans_out']
         self.val_beam_out = config['val_beam_out']
 
         self.dev_ref = self.data_manager.data_files[ac.VALIDATING][self.data_manager.trg_lang]
+        if self.restore_segments:
+            self.dev_ref = self.remove_bpe(self.dev_ref)
+
+        # I'll leave test alone for now since this version of the code doesn't automatically
+        # report BLEU on test anw. The reason is it's up to the dataset to use multi-bleu
+        # or NIST bleu. I'll include it in the future
         self.test_ref = self.data_manager.data_files[ac.TESTING][self.data_manager.trg_lang]
 
         self.bleu_curve_path = join(self.save_to, 'bleu_scores.npy')
@@ -53,7 +61,7 @@ class Validator(object):
             self.bleu_curve = numpy.load(self.bleu_curve_path)
         if exists(self.best_bleus_path):
             self.best_bleus = numpy.load(self.best_bleus_path)
-            
+
     def _ids_to_trans(self, trans_ids):
         words = []
         for idx in trans_ids:
@@ -152,6 +160,11 @@ class Validator(object):
         self.logger.info('Done translating.')
         self.logger.info('dev perplexity: {}'.format(perp))
 
+        # Remove BPE
+        if self.restore_segments:
+            val_trans_out = self.remove_bpe(val_trans_out)
+            val_beam_out = self.remove_bpe(val_beam_out)
+
         multibleu_cmd = ['perl', self.bleu_script, ref_file, '<', val_trans_out]
         p = Popen(' '.join(multibleu_cmd), shell=True, stdout=PIPE)
         output, _ = p.communicate()
@@ -225,3 +238,113 @@ class Validator(object):
         bleu_score = self.evaluate(sess, dev_m, ac.VALIDATING)
         self.maybe_save(sess, saver, bleu_score)
 
+    def remove_bpe(self, infile, outfile=None):
+        if not outfile:
+            outfile = infile + '.nobpe'
+
+        open(outfile, 'w').close()
+        Popen("sed -r 's/(@@ )|(@@ ?$)//g' < {} > {}".format(infile, outfile), shell=True, stdout=PIPE).communicate()
+        return outfile
+
+    def translate(self, sess, dev_m, input_file, unk_repl=True):
+        # Very redundant
+        def _ids_to_trans(trans_ids, trans_alignments, no_unk_src_toks):
+            words = []
+            word_ids = []
+            # Could have done better but this is clearer to me
+
+            if not unk_repl:
+                for idx, word_idx in enumerate(trans_ids):
+                    words.append(self.trg_ivocab[word_idx])
+                    word_ids.append(word_idx)
+                    if word_idx == ac.EOS_ID:
+                        break
+            else:
+                for idx, word_idx in enumerate(trans_ids):
+                    if word_idx == ac.UNK_ID:
+                        # Replace UNK with higest attention source words
+                        alignment = trans_alignments[idx]
+                        highest_att_src_tok_pos = numpy.argmax(alignment)
+                        words.append(no_unk_src_toks[highest_att_src_tok_pos])
+                    else:
+                        words.append(self.trg_ivocab[word_idx])
+                    word_ids.append(word_idx)
+
+                    if word_idx == ac.EOS_ID:
+                        break
+
+            return u' '.join(words), word_ids
+
+        def _get_trans(probs, scores, symbols, parents, alignments, no_unk_src_toks):
+            sorted_rows = numpy.argsort(scores[:, -1])[::-1]
+            best_trans_alignments = []
+            best_trans = None
+            best_tran_ids = None
+            beam_trans = []
+            for i, r in enumerate(sorted_rows):
+                row_idx = r
+                col_idx = scores.shape[1] - 1
+
+                trans_ids = []
+                trans_alignments = []
+                while True:
+                    if col_idx < 0:
+                        break
+
+                    trans_ids.append(symbols[row_idx, col_idx])
+                    align = alignments[row_idx, col_idx, :]
+                    trans_alignments.append(align)
+
+                    if i == 0:
+                        best_trans_alignments.append(align if not self.data_manager.reverse else align[::-1])
+
+                    row_idx = parents[row_idx, col_idx]
+                    col_idx -= 1
+
+                trans_ids = trans_ids[::-1]
+                trans_alignments = trans_alignments[::-1]
+                trans_out, trans_out_ids = _ids_to_trans(trans_ids, trans_alignments, no_unk_src_toks)
+                beam_trans.append(u'{} {:.2f} {:.2f}'.format(trans_out, scores[r, -1], probs[r, -1]))
+                if i == 0: # highest prob trans
+                    best_trans = trans_out
+                    best_tran_ids = trans_out_ids
+
+            return best_trans, best_tran_ids, u'\n'.join(beam_trans), best_trans_alignments[::-1]
+
+        best_trans_file = input_file + '.best_trans'
+        beam_trans_file = input_file + '.beam_trans'
+        open(best_trans_file, 'w').close()
+        open(beam_trans_file, 'w').close()
+        ftrans = open(best_trans_file, 'w', 'utf-8')
+        btrans = open(beam_trans_file, 'w', 'utf-8')
+
+        self.logger.info('Start translating {}'.format(input_file))
+        start = time.time()
+        count = 0
+        for (src_input, src_seq_len, no_unk_src_toks) in self.data_manager.get_trans_input(input_file):
+            feed = {
+                dev_m.src_inputs: src_input,
+                dev_m.src_seq_lengths: src_seq_len
+            }
+            probs, scores, symbols, parents, alignments = sess.run([dev_m.probs, dev_m.scores, dev_m.symbols, dev_m.parents, dev_m.alignments], feed_dict=feed)
+            alignments = numpy.transpose(alignments, axes=(1, 0, 2))
+
+            probs = numpy.transpose(numpy.array(probs))
+            scores = numpy.transpose(numpy.array(scores))
+            symbols = numpy.transpose(numpy.array(symbols))
+            parents = numpy.transpose(numpy.array(parents))
+
+            best_trans, best_trans_ids, beam_trans, best_trans_alignments = _get_trans(probs, scores, symbols, parents, alignments, no_unk_src_toks)
+            best_trans_wo_eos = best_trans.split()[:-1]
+            best_trans_wo_eos = u' '.join(best_trans_wo_eos)
+            ftrans.write(best_trans_wo_eos + '\n')
+            btrans.write(beam_trans + '\n\n')
+
+            count += 1
+            if count % 100 == 0:
+                self.logger.info('  Translating line {}, average {} seconds/sent'.format(count, (time.time() - start) / count))
+
+        ftrans.close()
+        btrans.close()
+
+        self.logger.info('Done translating {}, it takes {} minutes'.format(input_file, float(time.time() - start) / 60.0))
