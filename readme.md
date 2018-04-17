@@ -5,13 +5,13 @@ Tested with Python 2.7.3 and Tensorflow 1.1
 
 
 ## General
-This is the code for the paper [**Improving Lexical Choice in NMT**](https://arxiv.org/abs/1710.01329). The branches are:  
+This is the code for the paper [**Improving Lexical Choice in Neural Machine Translation**](https://arxiv.org/abs/1710.01329) (accepted at NAACL HLT 2018). The branches are:  
 
 * master: baseline NMT
 * tied_embedding: baseline NMT with tied embedding
 * fixnorm: fixnorm model in paper
 * fixnorm_lex: fixnorm+lex model in paper
-* arthur: apply the method of [Arthur et al.](https://arxiv.org/abs/1606.02006) on top of baseline NMT
+* arthur: apply the method of [Arthur et al.](https://arxiv.org/abs/1606.02006) on top of tied_embedding NMT
 
 
 To train a model:
