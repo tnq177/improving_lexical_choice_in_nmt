@@ -235,12 +235,16 @@ class Validator(object):
 
             if not unk_repl:
                 for idx, word_idx in enumerate(trans_ids):
-                    words.append(self.trg_ivocab[word_idx])
-                    word_ids.append(word_idx)
                     if word_idx == ac.EOS_ID:
                         break
+
+                    words.append(self.trg_ivocab[word_idx])
+                    word_ids.append(word_idx)
             else:
                 for idx, word_idx in enumerate(trans_ids):
+                    if word_idx == ac.EOS_ID:
+                        break
+                        
                     if word_idx == ac.UNK_ID:
                         # Replace UNK with higest attention source words
                         alignment = trans_alignments[idx]
@@ -250,8 +254,6 @@ class Validator(object):
                         words.append(self.trg_ivocab[word_idx])
                     word_ids.append(word_idx)
 
-                    if word_idx == ac.EOS_ID:
-                        break
 
             return u' '.join(words), word_ids
 
@@ -315,9 +317,7 @@ class Validator(object):
             parents = numpy.transpose(numpy.array(parents))
 
             best_trans, best_trans_ids, beam_trans, best_trans_alignments = _get_trans(probs, scores, symbols, parents, alignments, no_unk_src_toks)
-            best_trans_wo_eos = best_trans.split()[:-1]
-            best_trans_wo_eos = u' '.join(best_trans_wo_eos)
-            ftrans.write(best_trans_wo_eos + '\n')
+            ftrans.write(best_trans + '\n')
             btrans.write(beam_trans + '\n\n')
 
             count += 1
