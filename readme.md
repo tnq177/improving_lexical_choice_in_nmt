@@ -2,6 +2,7 @@
 
 
 Tested with Python 2.7.3 and Tensorflow 1.1  
+Talk: https://www3.nd.edu/~tnguye28/naacl18.pdf
 
 
 ## General
